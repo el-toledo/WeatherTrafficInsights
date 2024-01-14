@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from decouple import config
 from googletrans import Translator
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, IntegerType, FloatType, StringType
@@ -6,9 +7,8 @@ import googlemaps
 import json
 import requests
 import re
-from decouple import config
 
-# Criar a Spark Session
+# Criando a Spark Session
 spark = SparkSession.builder.appName("WeatherTrafficInsights").getOrCreate()
 
 gmaps_api_key = config('GMAPS_API_KEY')
@@ -52,7 +52,7 @@ def obter_previsao_tempo_origem(coordenadas, data_partida):
     resposta = requests.get(url_api)
     dados_previsao = json.loads(resposta.text)
 
-    # Encontrar o intervalo mais próximo a data de partida
+    # Encontra o intervalo mais próximo a data de partida
     data_partida = datetime.strptime(data_partida, "%Y-%m-%d %H:%M:%S")
     previsao_data_desejada = min(
         dados_previsao['list'],
@@ -76,7 +76,7 @@ def obter_previsao_tempo_destino(coordenadas, data_partida, tempo_viagem_minutos
     resposta = requests.get(url_api)
     dados_previsao = json.loads(resposta.text)
 
-    # Encontrar o intervalo mais próximo a data de partida
+    # Encontra o intervalo mais próximo a data de partida
     data_chegada = datetime.strptime(data_partida, "%Y-%m-%d %H:%M:%S") + timedelta(minutes=tempo_viagem_minutos)
     previsao_data_desejada = min(
         dados_previsao['list'],
@@ -94,8 +94,8 @@ def obter_previsao_tempo_destino(coordenadas, data_partida, tempo_viagem_minutos
 
     return temperatura, condicao_clima
 
-def obter_direcoes_com_coords(origin, destination, mode='driving'):
-    resultados_rota = gmaps.directions(origin, destination, mode=mode, language="pt-BR", region="BR")
+def obter_direcoes_com_coords(origem, destino, modo='driving'):
+    resultados_rota = gmaps.directions(origem, destino, mode=modo, language="pt-BR", region="BR")
     
     coordenadas_rota = []
     
