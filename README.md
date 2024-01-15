@@ -123,6 +123,9 @@ CREATE TABLE Rotas (
 );
 ```
 
+## Modelagem do Banco de Dados
+![Modelagem do Banco de Dados](/assets/modelagem-dados.png)
+
 ## Inserção de Dados de Exemplo
 ### Tabela Pessoas
 ```sql
@@ -141,6 +144,54 @@ INSERT INTO Rotas (cod_rota, cod_pessoa, origem_rota, destino_rota, data_rota, f
 ...
 (10, 10, 'Vitória - ES', 'Cuiabá - MT', '2024-01-24 10:00:00', 'Estudo');
 ```
+## Configuração do Glue
+### 1. Instale as bibliotecas externas do Glue
+
+Execute o seguinte comando na sua máquina local para obter as bibliotecas externas do Glue:
+
+```bash
+pip install <biblioteca1> <biblioteca2> -t "/caminho/para/salvar/as/bibliotecas"
+cd "/caminho/para/salvar/as/bibliotecas"
+zip -r dependencies.zip .
+```
+
+### 2. Faça o upload do arquivo zip para o S3
+
+Carregue o arquivo zip gerado ("dependencies.zip") em um bucket do Amazon S3. Copie o URI do S3 do arquivo, pois será necessário posteriormente.
+
+### 3. Configuração do Glue Job
+
+- Acesse o console do AWS Glue.
+- Crie um novo job ETL ou selecione um existente.
+
+### 4. Configuração Avançada
+
+- No detalhe do job, vá até o final da página e expanda as "Advanced Properties".
+
+### 5. Configuração do Python Library Path
+
+- No campo "Python library path" na seção de "Libraries", insira o URI do S3 do arquivo zip que você carregou no passo 2.
+![Carregando bibliotecas externas no Glue Job](/assets/libraries-dependencies-glue.png)
+
+### 6. Configuração do Job Parameter
+
+- Crie um parâmetro de job com a chave --JOB_NAME e o valor WeatherTraffic.
+![Criando um parâmetro de job no Glue Job](/assets/job-parametes-glue.png)
+
+### 7. Configuração da Role do IAM
+
+Certifique-se de que a role do IAM associada ao Glue Job tenha as permissões adequadas:
+
+- Acesso ao Amazon S3 para ler o arquivo zip e gravar logs.
+- Acesso ao Amazon CloudWatch para enviar logs de informações e erros.
+
+### 8. Configuração do Trigger do Job
+
+- Vá na seção de Triggers dentro da seção "Data Integration and ETL".
+- Adicione um trigger.
+- Coloque o tipo do trigger para Schedule
+- Coloque a frequência para Daily, hora de início para 3 (00:00 no Brasil), e minuto da hora para 0.
+![Adicionando Trigger diário ao Glue Job](/assets/trigger-glue-job.png)
 
 ## Configuração do Redshift
 ### 1. Criando um Namespace no Redshift Serverless
@@ -202,7 +253,7 @@ IGNOREHEADER 1;
 
 Abaixo é possível visualizar os dados integrados num relatório do PowerBI. Nele foram analisados os as métricas de Trânsito e de Clima.
 
-![Relatório do PowerBI](/assets/relatorio_pwbi.png)
+![Relatório do PowerBI](/assets/relatorio-pwbi.png)
 
 Acesse o relátorio [aqui](https://app.powerbi.com/links/xwKbI1VtUa?ctid=0bb39120-50db-4f9f-a488-fca5a4f342f4&pbi_source=linkShare).
 
