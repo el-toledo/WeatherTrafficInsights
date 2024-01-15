@@ -19,7 +19,6 @@ jobs:
           name: src-main
           path: src/
   
-jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
