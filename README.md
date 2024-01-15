@@ -123,6 +123,9 @@ CREATE TABLE Rotas (
 );
 ```
 
+## Modelagem do Banco de Dados
+![Modelagem do Banco de Dados](/assets/modelagem-dados.png)
+
 ## Inserção de Dados de Exemplo
 ### Tabela Pessoas
 ```sql
@@ -202,7 +205,7 @@ IGNOREHEADER 1;
 
 Abaixo é possível visualizar os dados integrados num relatório do PowerBI. Nele foram analisados os as métricas de Trânsito e de Clima.
 
-![Relatório do PowerBI](/assets/relatorio_pwbi.png)
+![Relatório do PowerBI](/assets/relatorio-pwbi.png)
 
 Acesse o relátorio [aqui](https://app.powerbi.com/links/xwKbI1VtUa?ctid=0bb39120-50db-4f9f-a488-fca5a4f342f4&pbi_source=linkShare).
 
