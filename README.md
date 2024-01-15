@@ -45,6 +45,32 @@ A arquitetura de dados apresentada é simples, porém altamente eficiente e esca
 
 Esta arquitetura proporciona uma base sólida para a construção de soluções analíticas escaláveis e eficientes, auxiliando a extrair insights valiosos a partir de seus dados de maneira ágil e confiável.
 
+## Integração Contínua/Entrega Contínua
+
+Este repositório é configurado com CI/CD (Continuous Integration/Continuos Delivery) para automatizar a atualização do código que irá executar o AWS Glue Job diariamente às 00:00. Isso permite uma integração contínua, garantindo que as mudanças de código sejam testadas e implantadas automaticamente no ambiente do AWS Glue.
+
+### Fluxo de Trabalho
+
+O fluxo de trabalho é acionado automaticamente quando há um push para a branch `main`. O processo é dividido em dois jobs: `build` e `deploy`.
+
+### Job de Build
+
+O job de build é responsável por preparar o código para implantação. Ele realiza as seguintes etapas:
+
+1. **Checkout do Código**: Usa o GitHub Actions para fazer o checkout do código no ambiente de execução.
+2. **Configurar o Ambiente Python**: Usa a ação `actions/setup-python` para configurar a versão específica do Python.
+3. **Persistir o Script Python**: Usa a ação `actions/upload-artifact` para persistir o script Python no diretório `src/`.
+
+### Job de Deploy
+
+O job de deploy é acionado após o job de build e é responsável por atualizar o código do AWS Glue Job. Ele realiza as seguintes etapas:
+
+1. **Baixar o Script Python do Build**: Usa a ação `actions/download-artifact` para baixar o script Python persistido durante o job de build.
+2. **Configurar Credenciais AWS**: Configura as credenciais AWS necessárias para acessar o S3 e atualizar o Glue Job (as credenciais foram armazenadas nos secrets do repositório).
+3. **Copiar o Arquivo para o Bucket S3**: Usa o comando `aws s3 cp` para copiar o script Python atualizado para o bucket S3.
+4. **Atualizar o Job Glue**: Usa o comando `aws glue update-job` para atualizar o Glue Job com o novo script Python.
+5. **Remover Arquivo de Credenciais Armazenado**: Remove as credenciais AWS do ambiente de execução.
+
 ## Dependências
 
 - `googlemaps`: Biblioteca cliente em Python para a API do Google Maps
