@@ -1,0 +1,50 @@
+name: build-and-deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Configurar Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      - name: Persistir script Python para uso entre jobs
+        uses: actions/upload-artifact@v2
+        with:
+          name: src-main
+          path: src/
+  
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar script Python do build
+        uses: actions/download-artifact@v2
+        with:
+          name: src-main
+          path: src/
+      - name: Configurar credenciais AWS usadas pelo AWS CLI
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          mkdir -p ~/.aws
+          touch ~/.aws/credentials
+          echo "[default]
+          aws_access_key_id = $AWS_ACCESS_KEY_ID
+          aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
+      - name: Copiar arquivo para o bucket S3
+        run: aws s3 cp src/main.py s3://${{secrets.S3_BUCKET}}/main.py --region us-east-1
+      - name: Atualizar job Glue para usar o novo script
+        run: |
+          aws glue update-job --job-name "WeatherTraffic" --job-update \
+            "Role=WeatherTrafficGlueRole,Command={Name=WeatherTraffic,ScriptLocation=s3://${{secrets.S3_BUCKET}}/main.py}" \
+            --region us-east-1
+      - name: Remover arquivo de credenciais armazenado
+        run: rm -rf ~/.aws
