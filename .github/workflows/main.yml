@@ -2,7 +2,7 @@ name: build-and-deploy
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
 
 jobs:
   build:
@@ -40,11 +40,11 @@ jobs:
           aws_access_key_id = $AWS_ACCESS_KEY_ID
           aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
       - name: Copiar arquivo para o bucket S3
-        run: aws s3 cp src/main.py s3://${{secrets.S3_BUCKET}}/main_${GITHUB_SHA}.py --region us-east-1
+        run: aws s3 cp src/main.py s3://${{secrets.S3_BUCKET}}/main.py --region us-east-1
       - name: Atualizar job Glue para usar o novo script
         run: |
           aws glue update-job --job-name "WeatherTraffic" --job-update \
-            "Role=WeatherTrafficGlueRole,Command={Name=WeatherTraffic,ScriptLocation=s3://${{secrets.S3_BUCKET}}/main_${GITHUB_SHA}.py}" \
+            "Role=WeatherTrafficGlueRole,Command={Name=WeatherTraffic,ScriptLocation=s3://${{secrets.S3_BUCKET}}/main.py}" \
             --region us-east-1
       - name: Remover arquivo de credenciais armazenado
         run: rm -rf ~/.aws
