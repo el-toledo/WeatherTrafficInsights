@@ -2,11 +2,14 @@ from datetime import datetime, timedelta
 from decouple import config
 from googletrans import Translator
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, IntegerType, FloatType, StringType
+from pyspark.sql.types import StructType, StructField, IntegerType, FloatType, StringType, ArrayType
+import pyspark.sql.functions as F
 import googlemaps
 import json
 import requests
 import re
+import pandas as pd
+import mysql.connector as connection
 
 # Criando a Spark Session
 spark = SparkSession.builder.appName("WeatherTrafficInsights").getOrCreate()
@@ -40,133 +43,224 @@ def extrair_tempo(tempo_string):
 
     return tempo_total
 
-# def obter_clima(coordenadas):
-#     url_api = 'http://api.openweathermap.org/data/2.5/weather?units=metric&lat=' \
-#               + str(coordenadas[0]) + '&lon=' + str(coordenadas[1]) + '&APPID=' + openweather_api_key
-#     resposta = requests.get(url_api)
-#     return json.loads(resposta.text)
-
-def obter_previsao_tempo_origem(coordenadas, data_partida):
+def obter_previsao_tempo_origem(latitude, longitude, data_partida):
     url_api = 'http://api.openweathermap.org/data/2.5/forecast?units=metric&lat=' \
-              + str(coordenadas[0]) + '&lon=' + str(coordenadas[1]) + '&APPID=' + openweather_api_key
+              + str(latitude) + '&lon=' + str(longitude) + '&APPID=' + openweather_api_key
     resposta = requests.get(url_api)
     dados_previsao = json.loads(resposta.text)
 
-    # Encontra o intervalo mais próximo a data de partida
-    data_partida = datetime.strptime(data_partida, "%Y-%m-%d %H:%M:%S")
-    previsao_data_desejada = min(
-        dados_previsao['list'],
-        key=lambda x: abs(datetime.utcfromtimestamp(x['dt']) - data_partida)
-    )
+    if 'list' in dados_previsao:
+        # Encontrar o intervalo mais próximo a data de partida
+        previsao_data_desejada = min(
+            dados_previsao['list'],
+            key=lambda x: abs(datetime.utcfromtimestamp(x['dt']) - data_partida)
+        )
 
-    previsao_tempo = {
-        'timestamp': data_partida,
-        'temperatura': previsao_data_desejada['main']['temp'],
-        'condicao': traduzir_condicao(previsao_data_desejada['weather'][0]['description'])
-    }
+        previsao_tempo = {
+            'timestamp': data_partida,
+            'temperatura': previsao_data_desejada['main']['temp'],
+            'condicao': traduzir_condicao(previsao_data_desejada['weather'][0]['description'])
+        }
 
-    temperatura = previsao_tempo['temperatura']
-    condicao_clima = previsao_tempo['condicao']
+        temperatura = float(previsao_tempo['temperatura'])
+        condicao_clima = previsao_tempo['condicao']
 
-    return temperatura, condicao_clima
+        return temperatura, condicao_clima
+    else:
+        print("Chave 'list' não encontrada no JSON. Atribuindo valores nulos.")
+        return None, None
 
-def obter_previsao_tempo_destino(coordenadas, data_partida, tempo_viagem_minutos):
+def obter_previsao_tempo_destino(latitude, longitude, data_partida, tempo_viagem_minutos):
     url_api = 'http://api.openweathermap.org/data/2.5/forecast?units=metric&lat=' \
-              + str(coordenadas[0]) + '&lon=' + str(coordenadas[1]) + '&APPID=' + openweather_api_key
+              + str(latitude) + '&lon=' + str(longitude) + '&APPID=' + openweather_api_key
     resposta = requests.get(url_api)
     dados_previsao = json.loads(resposta.text)
 
-    # Encontra o intervalo mais próximo a data de partida
-    data_chegada = datetime.strptime(data_partida, "%Y-%m-%d %H:%M:%S") + timedelta(minutes=tempo_viagem_minutos)
-    previsao_data_desejada = min(
-        dados_previsao['list'],
-        key=lambda x: abs(datetime.utcfromtimestamp(x['dt']) - data_chegada)
-    )
+    if 'list' in dados_previsao:
+        # Encontrar o intervalo mais próximo a data de chegada
+        data_chegada = data_partida + timedelta(minutes=tempo_viagem_minutos)
+        previsao_data_desejada = min(
+            dados_previsao['list'],
+            key=lambda x: abs(datetime.utcfromtimestamp(x['dt']) - data_chegada)
+        )
 
-    previsao_tempo = {
-        'timestamp': data_chegada,
-        'temperatura': previsao_data_desejada['main']['temp'],
-        'condicao': traduzir_condicao(previsao_data_desejada['weather'][0]['description'])
-    }
+        previsao_tempo = {
+            'timestamp': data_chegada,
+            'temperatura': previsao_data_desejada['main']['temp'],
+            'condicao': traduzir_condicao(previsao_data_desejada['weather'][0]['description'])
+        }
 
-    temperatura = previsao_tempo['temperatura']
-    condicao_clima = previsao_tempo['condicao']
+        temperatura = float(previsao_tempo['temperatura'])
+        condicao_clima = previsao_tempo['condicao']
 
-    return temperatura, condicao_clima
+        return temperatura, condicao_clima
+    else:
+        print("Chave 'list' não encontrada no JSON. Atribuindo valores nulos.")
+        return None, None
 
-def obter_direcoes_com_coords(origem, destino, modo='driving'):
+def obter_direcoes_com_coords(origem, destino, veiculo_de_preferencia):
+    modo = 'driving' if veiculo_de_preferencia in ['Carro', 'Moto'] else 'transit'
+
     resultados_rota = gmaps.directions(origem, destino, mode=modo, language="pt-BR", region="BR")
-    
+
     coordenadas_rota = []
-    
+
     if resultados_rota:
         for leg in resultados_rota[0]['legs']:
             for passo in leg['steps']:
                 local_origem = passo['start_location']
-                coordenadas_rota.append((local_origem['lat'], local_origem['lng']))
-                
-    distancia_rota = resultados_rota[0]['legs'][0]['distance']['text']
-    tempo_rota = resultados_rota[0]['legs'][0]['duration']['text']
+                coordenadas_rota.append({
+                    "latitude": local_origem['lat'],
+                    "longitude": local_origem['lng'],
+                    "distancia": float(re.sub(r',', '.', re.sub(r'[^\d,]', '', leg['distance']['text']))),
+                    "tempo": extrair_tempo(leg['duration']['text'])
+                })
 
-    distancia_rota = int(re.sub(r'\D', '', distancia_rota).replace(',', '.'))
-
-    tempo_rota = extrair_tempo(tempo_rota)
-
-    return coordenadas_rota, distancia_rota, tempo_rota
+    return coordenadas_rota
 
 
-def teste_api():
-# Teste para obter direções
-    origem = "Taubaté- SP, Brasil"
-    destino = "R. Justino Cobra, 61 - Vila Ema, São José dos Campos - SP, Brasil"
-    data_partida = "2024-01-15 08:00:00"
+usuario = config('DATABASE_USER')
+senha = config('DATABASE_PASSWORD')
+host = config('DATABASE_HOST')
+nome_bd = config('DATABASE_NAME')
 
-    # Obtendo coordenadas, distância e tempo da rota
-    coordenadas_rota, distancia_rota, tempo_rota = obter_direcoes_com_coords(origem, destino)
+database = connection.connect(host=host, database=nome_bd, user=usuario, passwd=senha, use_pure=True)
+query_pessoas = "SELECT * from Pessoas;"
+df_pessoas_pd = pd.read_sql(query_pessoas, database)
+df_pessoas = spark.createDataFrame(df_pessoas_pd)
 
-    # Definindo coordenadas de Origem
-    coordenadas_origem = (
-        coordenadas_rota[0][0],
-        coordenadas_rota[0][1]
-    )
+query_rotas = "SELECT * from Rotas;"
+df_rotas_pd = pd.read_sql(query_rotas, database)
+df_rotas = spark.createDataFrame(df_rotas_pd)
 
-    # Definindo coordenadas de Destino
-    coordenadas_destino = (
-        coordenadas_rota[-1][0],
-        coordenadas_rota[-1][1]
-    )
+database.close()
 
-    # Definindo o schema do DataFrame de Trânsito
-    schema_transito = StructType([
-        StructField("latitude", FloatType(), False),
-        StructField("longitude", FloatType(), False),
-        StructField("distancia", IntegerType(), False),
-        StructField("tempo", IntegerType(), False)
-    ])
+# Definindo o schema do DataFrame de Trânsito
+schema_transito = StructType([
+    StructField("cod_rota", IntegerType(), False),
+    StructField("latitude", FloatType(), True),
+    StructField("longitude", FloatType(), True),
+    StructField("distancia", FloatType(), True),
+    StructField("tempo", IntegerType(), True),
+    StructField("direcao_rota", IntegerType(), True),
+])
 
-    # Definindo o schema do DataFrame de Clima
-    schema_clima = StructType([
-        StructField("temperatura_origem", FloatType(), False),
-        StructField("condicao_clima_origem", StringType(), False),
-        StructField("temperatura_destino", FloatType(), False),
-        StructField("condicao_clima_destino", StringType(), False)
-    ])
+# Definindo o schema do DataFrame de Clima
+schema_clima = StructType([
+    StructField("cod_rota", IntegerType(), False),
+    StructField("temperatura_origem", FloatType(), True),
+    StructField("condicao_clima_origem", StringType(), True),
+    StructField("temperatura_destino", FloatType(), True),
+    StructField("condicao_clima_destino", StringType(), True),
+])
 
-    # Obtendo os dados de Trânsito
-    dados_transito = [(coord[0], coord[1], distancia_rota, tempo_rota) for coord in coordenadas_rota]
-    df_transito = spark.createDataFrame(dados_transito, schema=schema_transito)
+# Criando DataFrames vazios
+df_transito = spark.createDataFrame([], schema=schema_transito)
+df_clima = spark.createDataFrame([], schema=schema_clima)
 
-    # Obtendo a Temperatura e Condição do Clima para a Origem e o Destino
-    temperatura_origem, condicao_clima_origem = obter_previsao_tempo_origem(coordenadas_origem, data_partida)
-    temperatura_destino, condicao_clima_destino = obter_previsao_tempo_destino(coordenadas_destino, data_partida, tempo_rota)
+# Criando UDFs
+obter_direcoes_com_coords_udf = F.udf(obter_direcoes_com_coords, ArrayType(StructType([
+    StructField("latitude", FloatType(), True),
+    StructField("longitude", FloatType(), True),
+    StructField("distancia", FloatType(), True),
+    StructField("tempo", IntegerType(), True),
+])))
 
-    # Obtendo os dados de Trânsito
-    dados_clima = [(temperatura_origem, condicao_clima_origem, temperatura_destino, condicao_clima_destino)]
-    df_clima = spark.createDataFrame(dados_clima, schema=schema_clima)
+obter_previsao_tempo_origem_udf = F.udf(obter_previsao_tempo_origem, StructType([
+    StructField("temperatura_origem", FloatType(), True),
+    StructField("condicao_clima_origem", StringType(), True),
+]))
 
-    # Mostrando os dados dos DataFrames de Trânsito e Clima
-    df_transito.show(truncate=False)
-    df_clima.show(truncate=False)
+obter_previsao_tempo_destino_udf = F.udf(obter_previsao_tempo_destino, StructType([
+    StructField("temperatura_destino", FloatType(), True),
+    StructField("condicao_clima_destino", StringType(), True),
+]))
 
-if __name__ == '__main__':
-    teste_api()
+# Realizando join entre as bases de Pessoas e Rotas para obtenção do campo 'veiculo_de_preferencia'
+df_pessoas_rotas = df_rotas.join(df_pessoas, df_rotas["cod_pessoa"] == df_pessoas["cod_pessoa"])
+
+# Obtendo as coordenadas, distância e tempo da rota
+df_rotas_com_dados = df_pessoas_rotas.withColumn("dados_rota", obter_direcoes_com_coords_udf("origem_rota", "destino_rota", "veiculo_de_preferencia"))
+
+# Explodindo a coluna 'dados_rota' para criar múltiplas linhas
+df_rotas_explodido = df_rotas_com_dados.select(
+    "cod_rota",
+    "origem_rota",
+    "destino_rota",
+    "data_rota",
+    F.explode_outer("dados_rota").alias("dados_explodidos")
+)
+
+# Separando os dados explodidos
+df_transito = df_rotas_explodido.groupBy(
+    "cod_rota",
+    "data_rota",
+    F.col("dados_explodidos.distancia").alias("distancia_rota"),
+    F.col("dados_explodidos.tempo").alias("tempo_rota")
+).agg(
+    F.first("dados_explodidos.latitude").alias("origem_latitude"),
+    F.first("dados_explodidos.longitude").alias("origem_longitude"),
+    F.last("dados_explodidos.latitude").alias("destino_latitude"),
+    F.last("dados_explodidos.longitude").alias("destino_longitude"),
+).orderBy("cod_rota")
+
+# Adicionando as colunas ao DataFrame df_clima
+df_clima = df_transito.select(
+    "cod_rota",
+    "data_rota",
+    "origem_latitude",
+    "origem_longitude",
+    "destino_latitude",
+    "destino_longitude",
+    "tempo_rota"
+).select(
+    "cod_rota",
+    obter_previsao_tempo_origem_udf("origem_latitude", "origem_longitude", "data_rota").alias("origem"),
+    obter_previsao_tempo_destino_udf("destino_latitude", "destino_longitude", "data_rota", "tempo_rota").alias("destino")
+).select(
+    "cod_rota",
+    "origem.temperatura_origem",
+    "origem.condicao_clima_origem",
+    "destino.temperatura_destino",
+    "destino.condicao_clima_destino"
+).orderBy("cod_rota")
+
+# Criando visualizações dos DataFrames para utilização na query
+df_pessoas.createOrReplaceTempView("pessoas")
+df_rotas.createOrReplaceTempView("rotas")
+df_transito.createOrReplaceTempView("transito")
+df_clima.createOrReplaceTempView("clima")
+
+# Criando tabela principal para insights
+df_weather_traffic = spark.sql("""
+    SELECT
+      p.cod_pessoa,
+      r.cod_rota,
+      p.nome,
+      p.sexo,
+      p.idade,
+      p.veiculo_de_preferencia,
+      r.origem_rota,
+      r.destino_rota,
+      r.data_rota AS data_partida,
+      r.finalidade_rota,
+      t.origem_latitude,
+      t.origem_longitude,
+      t.destino_latitude,
+      t.destino_longitude,
+      t.distancia_rota,
+      t.tempo_rota,
+      c.temperatura_origem,
+      c.condicao_clima_origem,
+      c.temperatura_destino,
+      c.condicao_clima_destino
+    FROM pessoas p
+    INNER JOIN rotas r
+      ON p.cod_pessoa = r.cod_pessoa
+    INNER JOIN transito t
+      ON r.cod_rota = t.cod_rota
+      AND t.distancia_rota IS NOT NULL -- Tirando os dados nulos de viagens de Ônibus que não tem como serem realizadas
+    INNER JOIN clima c
+      ON t.cod_rota = c.cod_rota
+    ORDER BY cod_pessoa, cod_rota
+""")
