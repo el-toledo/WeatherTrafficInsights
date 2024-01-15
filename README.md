@@ -4,6 +4,47 @@
 
 O projeto WeatherTrafficInsights integra dados de clima e tráfego para fornecer insights para o planejamento de viagens. Ele utiliza as APIs do Google Maps e OpenWeatherMap para obter direções, detalhes de tráfego e previsões do tempo tanto para o local de partida quanto para o destino.
 
+## Arquitetura do Projeto
+![Arquitetura do Projeto](/assets/WeatherTrafficInsights-arquitetura.svg)
+
+A arquitetura de dados apresentada é simples, porém altamente eficiente e escalável. Ela é composta por Amazon RDS, AWS Glue, Amazon S3, Amazon Redshift e integração com o Power BI para análise e visualização de dados.
+
+## Visão Geral da Arquitetura
+
+1. **Amazon RDS (Relational Database Service):**
+   - O Amazon RDS é utilizado como um banco de dados relacional gerenciado, proporcionando escalabilidade, alta disponibilidade e segurança para armazenamento de dados estruturados.
+
+2. **AWS Glue:**
+   - O AWS Glue é empregado para a integração e transformação de dados. Ele permite a descoberta automática de metadados, facilitando a construção de pipelines de dados eficientes. Com o AWS Glue, a preparação e limpeza de dados tornam-se automatizadas, acelerando o processo de análise.
+
+3. **Amazon S3 (Simple Storage Service):**
+   - O Amazon S3 é utilizado como um repositório de armazenamento de dados altamente escalável e durável. Ele atua como o ponto central para armazenar os dados transformados, facilitando a integração e compartilhamento de dados entre os diferentes componentes da arquitetura.
+
+4. **Amazon Redshift:**
+   - O Amazon Redshift é empregado como um data warehouse para análises de alto desempenho. Ele permite consultas rápidas e complexas em grandes conjuntos de dados, fornecendo insights valiosos para suportar decisões estratégicas.
+
+5. **Power BI:**
+   - O Power BI é utilizado para a visualização e análise de dados. Ele se integra de maneira eficiente com o Amazon Redshift, permitindo a criação de dashboards interativos e relatórios personalizados para melhor compreensão e comunicação dos dados.
+
+## Vantagens da Arquitetura
+
+1. **Escalabilidade:**
+   - A arquitetura é altamente escalável, permitindo o processamento eficiente de grandes volumes de dados à medida que a demanda aumenta.
+
+2. **Automatização:**
+   - A utilização do AWS Glue automatiza tarefas de integração e transformação de dados, reduzindo o tempo e esforço necessário para preparar os dados para análise.
+
+3. **Segurança:**
+   - O Amazon RDS e o Amazon Redshift oferecem recursos avançados de segurança, garantindo a proteção dos dados armazenados e processados na arquitetura.
+
+4. **Integração:**
+   - A integração perfeita entre os serviços, como o Power BI e os armazenamentos S3 e Redshift, facilita a análise e visualização de dados, proporcionando uma experiência integrada para os usuários.
+
+5. **Desempenho:**
+   - O Amazon Redshift oferece consultas de alto desempenho, permitindo análises rápidas e eficientes, mesmo em grandes conjuntos de dados.
+
+Esta arquitetura proporciona uma base sólida para a construção de soluções analíticas escaláveis e eficientes, auxiliando a extrair insights valiosos a partir de seus dados de maneira ágil e confiável.
+
 ## Dependências
 
 - `googlemaps`: Biblioteca cliente em Python para a API do Google Maps
