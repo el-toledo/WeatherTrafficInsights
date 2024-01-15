@@ -2,7 +2,7 @@ name: build-and-deploy
 
 on:
   push:
-    branches: [ dev ]
+    branches: [dev]
 
 jobs:
   build:
@@ -16,9 +16,10 @@ jobs:
       - name: Persistir script Python para uso entre jobs
         uses: actions/upload-artifact@v2
         with:
-          name: main.py
-          path: src/main.py
+          name: src-main
+          path: src/
   
+jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -26,7 +27,8 @@ jobs:
       - name: Baixar script Python do build
         uses: actions/download-artifact@v2
         with:
-          name: src/main.py
+          name: src-main
+          path: src/
       - name: Instalar AWS CLI
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
