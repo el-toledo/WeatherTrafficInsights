@@ -62,7 +62,7 @@ def obter_previsao_tempo_origem(latitude, longitude, data_partida):
             'condicao': traduzir_condicao(previsao_data_desejada['weather'][0]['description'])
         }
 
-        temperatura = previsao_tempo['temperatura']
+        temperatura = float(previsao_tempo['temperatura'])
         condicao_clima = previsao_tempo['condicao']
 
         return temperatura, condicao_clima
@@ -90,7 +90,7 @@ def obter_previsao_tempo_destino(latitude, longitude, data_partida, tempo_viagem
             'condicao': traduzir_condicao(previsao_data_desejada['weather'][0]['description'])
         }
 
-        temperatura = previsao_tempo['temperatura']
+        temperatura = float(previsao_tempo['temperatura'])
         condicao_clima = previsao_tempo['condicao']
 
         return temperatura, condicao_clima
