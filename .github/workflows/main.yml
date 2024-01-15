@@ -44,7 +44,7 @@ jobs:
       - name: Atualizar job Glue para usar o novo script
         run: |
           aws glue update-job --job-name "WeatherTraffic" --job-update \
-            "Role=AWeatherTrafficGlueRole,Command={Name=WeatherTraffic,ScriptLocation=s3://${{secrets.S3_BUCKET}}/main_${GITHUB_SHA}.py}" \
+            "Role=WeatherTrafficGlueRole,Command={Name=WeatherTraffic,ScriptLocation=s3://${{secrets.S3_BUCKET}}/main_${GITHUB_SHA}.py}" \
             --region us-east-1
       - name: Remover arquivo de credenciais armazenado
         run: rm -rf ~/.aws
