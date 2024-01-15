@@ -48,10 +48,9 @@ Esta arquitetura proporciona uma base sólida para a construção de soluções 
 ## Dependências
 
 - `googlemaps`: Biblioteca cliente em Python para a API do Google Maps
-- `requests`: Biblioteca HTTP para fazer requisições a APIs
 - `googletrans`: API do Google Translate para tradução de idiomas
-- `pyspark`: Biblioteca Apache Spark para processamento distribuído de dados
-- `decouple`: Gerenciamento de configurações para separar chaves de API e informações sensíveis
+- `mysql.connector`: Biblioteca em Python para conectar e interagir com bancos de dados MySQL.
+- `boto3`: SDK (Software Development Kit) da Amazon Web Services (AWS) para Python, permitindo interação com serviços da AWS, como armazenamento em nuvem, computação em nuvem e outros recursos.
 
 ## Utilização
 
