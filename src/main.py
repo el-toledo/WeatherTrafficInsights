@@ -1,10 +1,11 @@
 from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
-from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
 from datetime import datetime, timedelta
+from typing import List, Tuple
 from googletrans import Translator
+from pyspark.context import SparkContext
 from pyspark.sql.types import StructType, StructField, IntegerType, FloatType, StringType, ArrayType
 from awsglue.dynamicframe import DynamicFrame
 from botocore.exceptions import ClientError
@@ -30,7 +31,12 @@ job.commit()
 
 
 def get_secret():
+    """
+    Obtém segredos do AWS Secrets Manager.
 
+    Returns:
+        dict: Dicionário contendo os segredos.
+    """
     secret_name = "WeatherTraffic"
     region_name = "us-east-1"
 
@@ -52,7 +58,9 @@ def get_secret():
 
     secrets = get_secret_value_response['SecretString']
 
-get_secret()
+    return secrets
+
+secrets = get_secret()
 
 # Credenciais para o Google Maps API
 gmaps_api_key = secrets['GMAPS_API_KEY']
@@ -85,7 +93,18 @@ def extrair_tempo(tempo_string):
 
     return tempo_total
 
-def obter_previsao_tempo_origem(latitude, longitude, data_partida):
+def obter_previsao_tempo_origem(latitude:float, longitude:float, data_partida:datetime) -> Tuple:
+    """
+    Obtém a previsão do tempo na origem.
+
+    Args:
+        latitude (float): Latitude da origem.
+        longitude (float): Longitude da origem.
+        data_partida (datetime): Data de partida.
+
+    Returns:
+        tuple: Temperatura e condição climática na origem.
+    """
     url_api = 'http://api.openweathermap.org/data/2.5/forecast?units=metric&lat=' \
               + str(latitude) + '&lon=' + str(longitude) + '&APPID=' + openweather_api_key
     resposta = requests.get(url_api)
@@ -112,7 +131,19 @@ def obter_previsao_tempo_origem(latitude, longitude, data_partida):
         print("Chave 'list' não encontrada no JSON. Atribuindo valores nulos.")
         return None, None
 
-def obter_previsao_tempo_destino(latitude, longitude, data_partida, tempo_viagem_minutos):
+def obter_previsao_tempo_destino(latitude:float, longitude:float, data_partida:datetime, tempo_viagem_minutos:int) -> Tuple:
+    """
+    Obtém a previsão do tempo no destino.
+
+    Args:
+        latitude (float): Latitude do destino.
+        longitude (float): Longitude do destino.
+        data_partida (datetime): Data de partida.
+        tempo_viagem_minutos (int): Tempo de viagem em minutos.
+
+    Returns:
+        tuple: Temperatura e condição climática no destino.
+    """
     url_api = 'http://api.openweathermap.org/data/2.5/forecast?units=metric&lat=' \
               + str(latitude) + '&lon=' + str(longitude) + '&APPID=' + openweather_api_key
     resposta = requests.get(url_api)
@@ -140,7 +171,18 @@ def obter_previsao_tempo_destino(latitude, longitude, data_partida, tempo_viagem
         print("Chave 'list' não encontrada no JSON. Atribuindo valores nulos.")
         return None, None
 
-def obter_direcoes_com_coords(origem, destino, veiculo_de_preferencia):
+def obter_direcoes_com_coords(origem:str, destino:str, veiculo_de_preferencia:str) -> List:
+    """
+    Obtém direções usando coordenadas.
+
+    Args:
+        origem (str): Coordenadas da origem.
+        destino (str): Coordenadas do destino.
+        veiculo_de_preferencia (str): Modo de transporte preferido.
+
+    Returns:
+        list: Lista de coordenadas da rota.
+    """
     modo = 'driving' if veiculo_de_preferencia in ['Carro', 'Moto'] else 'transit'
 
     resultados_rota = gmaps.directions(origem, destino, mode=modo, language="pt-BR", region="BR")
@@ -314,6 +356,7 @@ df_weather_traffic = df_weather_traffic.repartition(1)
 # Convertendo DataFrame do Spark para DynamicFrame
 df_weather_traffic_dynamic = DynamicFrame.fromDF(df_weather_traffic, glueContext, "df_weather_traffic_dynamic")
 
+# Escrevendo o DynamicFrame no S3
 glueContext.write_dynamic_frame.from_options(
     frame=df_weather_traffic_dynamic,
     connection_type="s3",
