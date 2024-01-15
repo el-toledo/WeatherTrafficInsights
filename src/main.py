@@ -1,23 +1,73 @@
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from awsglue.context import GlueContext
+from awsglue.job import Job
 from datetime import datetime, timedelta
-from decouple import config
+from typing import List, Tuple
 from googletrans import Translator
-from pyspark.sql import SparkSession
+from pyspark.context import SparkContext
 from pyspark.sql.types import StructType, StructField, IntegerType, FloatType, StringType, ArrayType
+from awsglue.dynamicframe import DynamicFrame
+from botocore.exceptions import ClientError
 import pyspark.sql.functions as F
+import sys
 import googlemaps
 import json
 import requests
 import re
 import pandas as pd
 import mysql.connector as connection
+import boto3
 
-# Criando a Spark Session
-spark = SparkSession.builder.appName("WeatherTrafficInsights").getOrCreate()
+## @params: [JOB_NAME]
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
 
-gmaps_api_key = config('GMAPS_API_KEY')
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+job.commit()
+
+
+def get_secret():
+    """
+    Obtém segredos do AWS Secrets Manager.
+
+    Returns:
+        dict: Dicionário contendo os segredos.
+    """
+    secret_name = "WeatherTraffic"
+    region_name = "us-east-1"
+
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+    except ClientError as e:
+        # For a list of exceptions thrown, see
+        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+        raise e
+
+    secrets = get_secret_value_response['SecretString']
+
+    return secrets
+
+secrets = get_secret()
+
+# Credenciais para o Google Maps API
+gmaps_api_key = secrets['GMAPS_API_KEY']
 gmaps = googlemaps.Client(key=gmaps_api_key)
 
-openweather_api_key = config('OPENWEATHER_API_KEY')
+# Credenciais para a OpenWeather API
+openweather_api_key = secrets['OPENWEATHER_API_KEY']
 
 def traduzir_condicao(descricao):
     tradutor = Translator()
@@ -43,7 +93,18 @@ def extrair_tempo(tempo_string):
 
     return tempo_total
 
-def obter_previsao_tempo_origem(latitude, longitude, data_partida):
+def obter_previsao_tempo_origem(latitude:float, longitude:float, data_partida:datetime) -> Tuple:
+    """
+    Obtém a previsão do tempo na origem.
+
+    Args:
+        latitude (float): Latitude da origem.
+        longitude (float): Longitude da origem.
+        data_partida (datetime): Data de partida.
+
+    Returns:
+        tuple: Temperatura e condição climática na origem.
+    """
     url_api = 'http://api.openweathermap.org/data/2.5/forecast?units=metric&lat=' \
               + str(latitude) + '&lon=' + str(longitude) + '&APPID=' + openweather_api_key
     resposta = requests.get(url_api)
@@ -70,7 +131,19 @@ def obter_previsao_tempo_origem(latitude, longitude, data_partida):
         print("Chave 'list' não encontrada no JSON. Atribuindo valores nulos.")
         return None, None
 
-def obter_previsao_tempo_destino(latitude, longitude, data_partida, tempo_viagem_minutos):
+def obter_previsao_tempo_destino(latitude:float, longitude:float, data_partida:datetime, tempo_viagem_minutos:int) -> Tuple:
+    """
+    Obtém a previsão do tempo no destino.
+
+    Args:
+        latitude (float): Latitude do destino.
+        longitude (float): Longitude do destino.
+        data_partida (datetime): Data de partida.
+        tempo_viagem_minutos (int): Tempo de viagem em minutos.
+
+    Returns:
+        tuple: Temperatura e condição climática no destino.
+    """
     url_api = 'http://api.openweathermap.org/data/2.5/forecast?units=metric&lat=' \
               + str(latitude) + '&lon=' + str(longitude) + '&APPID=' + openweather_api_key
     resposta = requests.get(url_api)
@@ -98,7 +171,18 @@ def obter_previsao_tempo_destino(latitude, longitude, data_partida, tempo_viagem
         print("Chave 'list' não encontrada no JSON. Atribuindo valores nulos.")
         return None, None
 
-def obter_direcoes_com_coords(origem, destino, veiculo_de_preferencia):
+def obter_direcoes_com_coords(origem:str, destino:str, veiculo_de_preferencia:str) -> List:
+    """
+    Obtém direções usando coordenadas.
+
+    Args:
+        origem (str): Coordenadas da origem.
+        destino (str): Coordenadas do destino.
+        veiculo_de_preferencia (str): Modo de transporte preferido.
+
+    Returns:
+        list: Lista de coordenadas da rota.
+    """
     modo = 'driving' if veiculo_de_preferencia in ['Carro', 'Moto'] else 'transit'
 
     resultados_rota = gmaps.directions(origem, destino, mode=modo, language="pt-BR", region="BR")
@@ -119,10 +203,11 @@ def obter_direcoes_com_coords(origem, destino, veiculo_de_preferencia):
     return coordenadas_rota
 
 
-usuario = config('DATABASE_USER')
-senha = config('DATABASE_PASSWORD')
-host = config('DATABASE_HOST')
-nome_bd = config('DATABASE_NAME')
+# Credenciais para o banco de dados
+usuario = secrets['DATABASE_USER']
+senha = secrets['DATABASE_PASSWORD']
+host = secrets['DATABASE_HOST']
+nome_bd = secrets['DATABASE_NAME']
 
 database = connection.connect(host=host, database=nome_bd, user=usuario, passwd=senha, use_pure=True)
 query_pessoas = "SELECT * from Pessoas;"
@@ -264,3 +349,24 @@ df_weather_traffic = spark.sql("""
       ON t.cod_rota = c.cod_rota
     ORDER BY cod_pessoa, cod_rota
 """)
+
+# Ajustando o número de partições antes de converter em DynamicFrame
+df_weather_traffic = df_weather_traffic.repartition(1)
+
+# Convertendo DataFrame do Spark para DynamicFrame
+df_weather_traffic_dynamic = DynamicFrame.fromDF(df_weather_traffic, glueContext, "df_weather_traffic_dynamic")
+
+# Escrevendo o DynamicFrame no S3
+glueContext.write_dynamic_frame.from_options(
+    frame=df_weather_traffic_dynamic,
+    connection_type="s3",
+    connection_options={"path": "s3://weathertrafficinsights/weather-traffic-data/"},
+    format="csv",
+    format_options={
+        "quoteChar": -1,
+        "separator": ",",
+        "withHeader": True,
+        "writeHeader": True
+    },
+    transformation_ctx = "datasink2"
+)
