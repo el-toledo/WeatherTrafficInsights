@@ -157,6 +157,14 @@ CSV
 IGNOREHEADER 1;
 ```
 
+## Visualização dos Dados
+
+Abaixo é possível visualizar os dados integrados num relatório do PowerBI. Nele foram analisados os as métricas de Trânsito e de Clima.
+
+![Relatório do PowerBI](/assets/relatorio_pwbi.png)
+
+Acesse o relátorio [aqui](https://app.powerbi.com/links/xwKbI1VtUa?ctid=0bb39120-50db-4f9f-a488-fca5a4f342f4&pbi_source=linkShare).
+
 ## Padrões de Branches e Commits
 
 ### Branches
