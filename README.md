@@ -239,7 +239,7 @@ Certifique-se de que a role do IAM associada ao Glue Job tenha as permissões ad
 2. Clique no botão "Query data" para acessar o editor de consultas do Redshift.
 ![Imagem do namespace para o Query data](/assets/redshift-query-data.png)
 
-### 5. Crie a tabela no Redshift correspondente ao DataFrame df_weather_traffic
+### 5. Crie a tabela no Redshift correspondente ao arquivo CSV salvo no S3
 ```sql
 CREATE TABLE WeatherTraffic (
    cod_pessoa BIGINT,
