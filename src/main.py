@@ -32,15 +32,15 @@ job.commit()
 
 def get_secret():
     """
-    Obtém segredos do AWS Secrets Manager.
+    Obtém os secrets do AWS Secrets Manager.
 
     Returns:
-        dict: Dicionário contendo os segredos.
+        dict: Dicionário contendo os secrets.
     """
     secret_name = "WeatherTraffic"
     region_name = "us-east-1"
 
-    # Create a Secrets Manager client
+    # Cria o Secrets Manager client
     session = boto3.session.Session()
     client = session.client(
         service_name='secretsmanager',
@@ -52,12 +52,9 @@ def get_secret():
             SecretId=secret_name
         )
     except ClientError as e:
-        # For a list of exceptions thrown, see
-        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
         raise e
-
-    secrets = get_secret_value_response['SecretString']
-
+        
+    secrets = json.loads(get_secret_value_response['SecretString'])
     return secrets
 
 secrets = get_secret()
@@ -360,7 +357,7 @@ df_weather_traffic_dynamic = DynamicFrame.fromDF(df_weather_traffic, glueContext
 glueContext.write_dynamic_frame.from_options(
     frame=df_weather_traffic_dynamic,
     connection_type="s3",
-    connection_options={"path": "s3://weathertrafficinsights/weather-traffic-data/"},
+    connection_options={"path": "s3://weathertrafficinsights/data/"},
     format="csv",
     format_options={
         "quoteChar": -1,
