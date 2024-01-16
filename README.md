@@ -80,11 +80,18 @@ O job de deploy é acionado após o job de build e é responsável por atualizar
 
 ## Utilização
 
-1. **Configurar chaves de API:** Obtenha chaves de API para o Google Maps (`GMAPS_API_KEY`) e OpenWeatherMap (`OPENWEATHER_API_KEY`). Armazene-as em um arquivo `.env` usando o `decouple`.
+1. **Configurar credenciais:** 
+- Obtenha chaves de API para o Google Maps (`GMAPS_API_KEY`) e OpenWeatherMap (`OPENWEATHER_API_KEY`). 
+- Coloque as juntos com as demais credenciais de acesso do banco no AWS Secrets Manager
 
    ```plaintext
    GMAPS_API_KEY=sua_chave_api_do_google_maps
    OPENWEATHER_API_KEY=sua_chave_api_do_openweather
+   DATABASE_USER=usuario_do_banco_de_dados
+   DATABASE_PASSWORD=senha_do_banco_de_dados
+   DATABASE_HOST=host_do_banco_de_dados
+   DATABASE_NAME=nome_do_banco_de_dados
+   ```
 
 ## Funcionalidades
 
@@ -212,9 +219,21 @@ Carregue o arquivo zip gerado ("dependencies.zip") em um bucket do Amazon S3. Co
 
 Certifique-se de que a role do IAM associada ao Glue Job tenha as permissões adequadas:
 
-- Acesso ao Amazon S3 para ler o arquivo zip e salvar a tabela final.
-- Acesso ao Amazon CloudWatch para enviar logs de informações e erros.
-
+- Acesso ao Amazon S3 para ler o arquivo zip e salvar a tabela final. Pode ser feito com a política criada pela AWS chamada ***AmazonS3FullAccess***.
+- Acesso ao Amazon CloudWatch para enviar logs de informações e erros. Pode ser feito com a política criada pela AWS chamada ***CloudWatchFullAccess***.
+- Acesso ao Secret do AWS Secrets Manager pela seguinte política:
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "secretsmanager:GetSecretValue",
+            "Resource": "arn:aws:secretsmanager:<region-name>:<account-id>:secret:<secret-name>"
+        }
+    ]
+}
+```
 ### 8. Configuração do Trigger do Job
 
 - Vá na seção de Triggers dentro da seção "Data Integration and ETL".
