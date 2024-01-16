@@ -170,15 +170,18 @@ INSERT INTO Rotas (cod_rota, cod_pessoa, origem_rota, destino_rota, data_rota, f
 (10, 10, 'Vitória - ES', 'Cuiabá - MT', '2024-01-24 10:00:00', 'Estudo');
 ```
 ## Configuração do Glue
-### 1. Instale as bibliotecas externas do Glue
+### 1. Instale as bibliotecas externas do script para o Glue Job
 
 Execute o seguinte comando na sua máquina local para obter as bibliotecas externas do Glue:
 
 ```bash
-pip install <biblioteca1> <biblioteca2> -t "/caminho/para/salvar/as/bibliotecas"
+pip install googletrans==4.0.0-rc1 googlemaps mysql.connector -t "/caminho/para/salvar/as/bibliotecas"
 cd "/caminho/para/salvar/as/bibliotecas"
+rm -rf "/caminho/para/salvar/as/bibliotecas/urllib3"
 zip -r dependencies.zip .
 ```
+
+`Obs: É necessário remover a pasta urllib3 antes de zipar as bibliotecas pois o boto3 será carregado manualmente pelo Job Parameter do Glue Job, se não remover o urllib3 retornará um erro.`
 
 ### 2. Faça o upload do arquivo zip para o S3
 
@@ -198,10 +201,12 @@ Carregue o arquivo zip gerado ("dependencies.zip") em um bucket do Amazon S3. Co
 - No campo "Python library path" na seção de "Libraries", insira o URI do S3 do arquivo zip que você carregou no passo 2.
 ![Carregando bibliotecas externas no Glue Job](/assets/libraries-dependencies-glue.png)
 
-### 6. Configuração do Job Parameter
+### 6. Configuração do Job Parameters
 
 - Crie um parâmetro de job com a chave --JOB_NAME e o valor WeatherTraffic.
+- Crie um outro parâmetro de job com a chave --additional-python-modules e o valor boto3.
 ![Criando um parâmetro de job no Glue Job](/assets/job-parametes-glue.png)
+
 
 ### 7. Configuração da Role do IAM
 
