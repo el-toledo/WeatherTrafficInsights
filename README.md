@@ -207,14 +207,14 @@ Carregue o arquivo zip gerado ("dependencies.zip") em um bucket do Amazon S3. Co
 
 Certifique-se de que a role do IAM associada ao Glue Job tenha as permissões adequadas:
 
-- Acesso ao Amazon S3 para ler o arquivo zip e gravar logs.
+- Acesso ao Amazon S3 para ler o arquivo zip e salvar a tabela final.
 - Acesso ao Amazon CloudWatch para enviar logs de informações e erros.
 
 ### 8. Configuração do Trigger do Job
 
 - Vá na seção de Triggers dentro da seção "Data Integration and ETL".
 - Adicione um trigger.
-- Coloque o tipo do trigger para Schedule
+- Coloque o tipo do trigger para Schedule.
 - Coloque a frequência para Daily, hora de início para 3 (00:00 no Brasil), e minuto da hora para 0.
 ![Adicionando Trigger diário ao Glue Job](/assets/trigger-glue-job.png)
 
@@ -239,15 +239,15 @@ Certifique-se de que a role do IAM associada ao Glue Job tenha as permissões ad
 2. Clique no botão "Query data" para acessar o editor de consultas do Redshift.
 ![Imagem do namespace para o Query data](/assets/redshift-query-data.png)
 
-### 5. Crie a tabela no Redshift correspondente ao DataFrame df_weather_traffic
+### 5. Crie a tabela no Redshift correspondente ao arquivo CSV salvo no S3
 ```sql
 CREATE TABLE WeatherTraffic (
    cod_pessoa BIGINT,
    cod_rota BIGINT,
    nome VARCHAR(255),
-   sexo VARCHAR(255),
+   sexo VARCHAR(10),
    idade BIGINT,
-   veiculo_de_preferencia VARCHAR(255),
+   veiculo_de_preferencia VARCHAR(50),
    origem_rota VARCHAR(255),
    destino_rota VARCHAR(255),
    data_partida TIMESTAMP,
@@ -259,9 +259,9 @@ CREATE TABLE WeatherTraffic (
    distancia_rota FLOAT,
    tempo_rota INT,
    temperatura_origem FLOAT,
-   condicao_clima_origem VARCHAR(255),
+   condicao_clima_origem VARCHAR(50),
    temperatura_destino FLOAT,
-   condicao_clima_destino VARCHAR(255)
+   condicao_clima_destino VARCHAR(50)
 );
 ```
 ### 6. Copie os dados do arquivo CSV no S3 para a tabela no Redshift
